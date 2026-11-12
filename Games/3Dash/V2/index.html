@@ -1,0 +1,218 @@
+<html lang="en-US">
+<head>
+    <title>3Dash</title>
+    <meta name="description" content="Play 3Dash online and survive intense 3D rhythm gameplay with spikes, portals, wave sections, custom levels, and fast reaction challenges.">
+    <meta name="robots" content="noindex, nofollow">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        html, body {
+            box-sizing: border-box;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            background: #000000 !important;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: rgba(0,0,0,0);
+        }
+
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+
+        #gameContainer {
+            width: 100% !important;
+            height: 100% !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            background: #000000 !important;
+            z-index: 99998 !important;
+        }
+
+        #canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block !important;
+            background: #000000 !important;
+            position: relative !important;
+            z-index: 99999 !important;
+            outline: none !important;
+        }
+
+        #loading-cover {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+            background: #000000 !important;
+            z-index: 9997 !important;
+        }
+
+        #unity-progress-bar-empty {
+            width: 200px;
+            height: 6px;
+            background: #111111;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        #unity-progress-bar-full {
+            width: 0%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        #unity-container, .container, #loader, .pos_spinner, .spinner {
+            display: none !important;
+        }
+    </style>
+</head>
+<body style="background: #000000 !important;">
+    <div id="gameContainer">
+        <canvas id="canvas" tabindex="-1"></canvas>
+    </div>
+
+    <div id="loading-cover">
+        <div id="unity-loading-bar">
+            <div id="unity-progress-bar-empty">
+                <div id="unity-progress-bar-full"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ysdk = null;
+        let player = null;
+        let payments = null;
+        let myGameInstance = null;
+        var cloudSaves = 'noData';
+        var paymentsData = 'none';
+        var playerData = 'noData';
+        var environmentData = JSON.stringify({
+            "language": "en", "domain": "com", "deviceType": "desktop",
+            "isMobile": false, "isDesktop": true, "isTablet": false, "isTV": false,
+            "appID": "1", "browserLang": "en", "payload": "",
+            "promptCanShow": false, "reviewCanShow": false,
+            "platform": navigator.platform, "browser": "Chrome"
+        });
+
+        function LocalHost() {
+            var host = window.location.hostname;
+            return (host == "localhost" || host == "127.0.0.1" || host == "");
+        }
+
+        async function InitYSDK() {
+            try {
+                if (window.YaGames) {
+                    ysdk = await YaGames.init();
+                }
+            } catch (e) {
+                console.log('Yandex SDK initialization skipped or unavailable.');
+            }
+        }
+        InitYSDK();
+
+        function RequestingEnvironmentData(sendback) {
+            if (sendback && myGameInstance) {
+                myGameInstance.SendMessage('YANDEX', 'GettingDevice', environmentData);
+            }
+            return Promise.resolve(environmentData);
+        }
+        function LoadCloud(sendback) { return Promise.resolve('noData'); }
+        function GetPayments(sendback) { return Promise.resolve('none'); }
+        function InitPlayer(sendback) { 
+            return Promise.resolve(JSON.stringify({
+                "playerAuth": "rejected", "playerName": "unauthorized",
+                "playerId": "unauthorized", "playerPhoto": "null"
+            })); 
+        }
+        function FullAdShow() {}
+        function RewardedShow(id) {}
+        function StickyAdActivity(show) {}
+        function Start() {}
+
+        const levelTerms = ["Уровень", "Уровни", "Level"];
+        const otherTerms = {
+            "Выйти в меню": "Exit to menu",
+            "Показать путь": "Show Path",
+            "Продолжить": "Resume",
+            "Практика": "Practice",
+            "Пауза": "Pause"
+        };
+
+        const originalFillText = CanvasRenderingContext2D.prototype.fillText;
+        CanvasRenderingContext2D.prototype.fillText = function(text, x, y, maxWidth) {
+            let modifiedText = text;
+            let isMatch = false;
+            for (let ru of levelTerms) {
+                if (modifiedText.includes(ru)) { modifiedText = modifiedText.replace(ru, "Levels"); isMatch = true; }
+            }
+            for (let ru in otherTerms) {
+                if (modifiedText.includes(ru)) { modifiedText = modifiedText.replace(ru, otherTerms[ru]); isMatch = true; }
+            }
+            if (isMatch) { this.fillStyle = '#ffffff'; }
+            return originalFillText.call(this, modifiedText, x, y, maxWidth);
+        };
+
+        const originalStrokeText = CanvasRenderingContext2D.prototype.strokeText;
+        CanvasRenderingContext2D.prototype.strokeText = function(text, x, y, maxWidth) {
+            let modifiedText = text;
+            let isMatch = false;
+            for (let ru of levelTerms) {
+                if (modifiedText.includes(ru)) { modifiedText = modifiedText.replace(ru, "Levels"); isMatch = true; }
+            }
+            for (let ru in otherTerms) {
+                if (modifiedText.includes(ru)) { modifiedText = modifiedText.replace(ru, otherTerms[ru]); isMatch = true; }
+            }
+            if (isMatch) { this.strokeStyle = '#ffffff'; }
+            return originalStrokeText.call(this, modifiedText, x, y, maxWidth);
+        };
+
+        const buildUrl = "Build";
+        const loaderUrl = buildUrl + "/3DDash.loader.js";
+        const config = {
+            dataUrl: buildUrl + "/3DDash.data.unityweb",
+            frameworkUrl: buildUrl + "/3DDash.framework.js.unityweb",
+            codeUrl: buildUrl + "/3DDash.wasm.unityweb",
+            streamingAssetsUrl: "StreamingAssets"
+        };
+
+        const canvas = document.querySelector("#canvas");
+        const loadingCover = document.querySelector("#loading-cover");
+        const progressBarFull = document.querySelector("#unity-progress-bar-full");
+
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        window.addEventListener('pointerdown', () => { window.focus(); canvas.focus(); });
+        window.addEventListener('touchstart', () => { window.focus(); canvas.focus(); });
+
+        const script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = () => {
+            createUnityInstance(canvas, config, (progress) => {
+                if (progressBarFull) {
+                    progressBarFull.style.width = `${100 * progress}%`;
+                }
+            }).then((unityInstance) => {
+                myGameInstance = unityInstance;
+                if (loadingCover) {
+                    loadingCover.style.display = "none";
+                }
+            }).catch((message) => {
+                console.error("Unity Loader Error:", message);
+            });
+        };
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>
